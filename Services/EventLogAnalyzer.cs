@@ -26,18 +26,29 @@ namespace MonitorEventViewer.Services
 
         public Dictionary<string, int> GetEventCountsByTimeRange(DateTime startTime, DateTime endTime)
         {
-            var eventLog = new EventLog(_logName, _machineName);
             var counts = new Dictionary<string, int>();
-
-            foreach (EventLogEntry entry in eventLog.Entries)
+            try
             {
-                if (entry.TimeWritten >= startTime && entry.TimeWritten <= endTime)
+                Console.WriteLine($"Tentando acessar log '{_logName}' na máquina '{_machineName}'");
+                var eventLog = new EventLog(_logName, _machineName);
+                Console.WriteLine($"Total de entradas no log: {eventLog.Entries.Count}");
+
+                foreach (EventLogEntry entry in eventLog.Entries)
                 {
-                    string source = entry.Source;
-                    if (!counts.ContainsKey(source))
-                        counts[source] = 0;
-                    counts[source]++;
+                    if (entry.TimeWritten >= startTime && entry.TimeWritten <= endTime)
+                    {
+                        string source = entry.Source;
+                        if (!counts.ContainsKey(source))
+                            counts[source] = 0;
+                        counts[source]++;
+                    }
                 }
+                Console.WriteLine($"Eventos encontrados no período: {counts.Sum(x => x.Value)}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao acessar log de eventos: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
             }
 
             return counts;
@@ -45,30 +56,62 @@ namespace MonitorEventViewer.Services
 
         public byte[] GenerateChartImage(Dictionary<string, int> eventCounts)
         {
-            var plt = new Plot(1200, 800);
-
-            double[] values = eventCounts.Values.Select(x => (double)x).ToArray();
-            string[] labels = eventCounts.Keys.ToArray();
-
-            plt.AddBar(values);
-            plt.XTicks(Enumerable.Range(0, labels.Length).Select(x => (double)x).ToArray(), labels);
-            plt.XAxis.TickLabelStyle(rotation: 45);
-
-            // Criar um arquivo temporário
-            string tempFile = Path.Combine(Path.GetTempPath(), $"chart_{Guid.NewGuid()}.png");
             try
             {
+                Console.WriteLine("Iniciando geração do gráfico");
+                var plt = new Plot(1200, 800);
+
+                double[] values = eventCounts.Values.Select(x => (double)x).ToArray();
+                string[] labels = eventCounts.Keys.ToArray();
+
+                Console.WriteLine($"Dados para o gráfico: {values.Length} valores, {labels.Length} rótulos");
+
+                plt.AddBar(values);
+                plt.XTicks(Enumerable.Range(0, labels.Length).Select(x => (double)x).ToArray(), labels);
+                plt.XAxis.TickLabelStyle(rotation: 45);
+
+                string tempFile = Path.Combine(Path.GetTempPath(), $"chart_{Guid.NewGuid()}.png");
+                Console.WriteLine($"Salvando gráfico em: {tempFile}");
+
                 plt.SaveFig(tempFile);
-                // Ler o arquivo e retornar como byte array
-                return File.ReadAllBytes(tempFile);
-            }
-            finally
-            {
-                // Garantir que o arquivo temporário seja deletado
+                Console.WriteLine("Gráfico salvo com sucesso");
+
+                var bytes = File.ReadAllBytes(tempFile);
+                Console.WriteLine($"Arquivo lido: {bytes.Length} bytes");
+
                 if (File.Exists(tempFile))
                 {
                     File.Delete(tempFile);
+                    Console.WriteLine("Arquivo temporário deletado");
                 }
+
+                return bytes;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao gerar gráfico: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                throw;
+            }
+        }
+
+        public byte[] TestChart()
+        {
+            try
+            {
+                var plt = new Plot(600, 400);
+                double[] values = { 1, 2, 3, 4, 5 };
+                plt.AddBar(values);
+
+                string tempFile = Path.Combine(Path.GetTempPath(), $"test_chart_{Guid.NewGuid()}.png");
+                plt.SaveFig(tempFile);
+
+                return File.ReadAllBytes(tempFile);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro no teste do ScottPlot: {ex.Message}");
+                throw;
             }
         }
 

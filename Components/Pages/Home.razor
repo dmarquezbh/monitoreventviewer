@@ -99,7 +99,16 @@
     }
 </div>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
+
 @code {
+    private string errorMessage = "";
+
     private DateTime StartTime { get; set; } = DateTime.Today.AddHours(8);
     private DateTime EndTime { get; set; } = DateTime.Today.AddHours(18);
     private string MachineName { get; set; } = "192.168.200.7";
@@ -112,17 +121,45 @@
     {
         try
         {
+            errorMessage = "";
+
             await Task.Run(() =>
             {
+                // Teste do ScottPlot
+                var testImageBytes = EventLogAnalyzer.TestChart();
+                ChartImageBase64 = Convert.ToBase64String(testImageBytes);
+                Console.WriteLine("Gráfico de teste gerado com sucesso.");
+            });
+
+            await Task.Run(() =>
+            {
+                Console.WriteLine("Iniciando carregamento de eventos...");
+
                 EventCounts = EventLogAnalyzer.GetEventCountsByTimeRange(StartTime, EndTime);
-                var imageBytes = EventLogAnalyzer.GenerateChartImage(EventCounts);
-                ChartImageBase64 = Convert.ToBase64String(imageBytes);
+                Console.WriteLine($"Eventos carregados: {EventCounts?.Count ?? 0} fontes encontradas");
+
+                if (EventCounts?.Count > 0)
+                {
+                    Console.WriteLine("Gerando gráfico...");
+                    var imageBytes = EventLogAnalyzer.GenerateChartImage(EventCounts);
+                    Console.WriteLine($"Tamanho da imagem gerada: {imageBytes?.Length ?? 0} bytes");
+
+                    ChartImageBase64 = Convert.ToBase64String(imageBytes);
+                    Console.WriteLine("Imagem convertida para Base64");
+                }
+                else
+                {
+                    Console.WriteLine("Nenhum evento encontrado para gerar o gráfico");
+                }
+
                 SelectedSource = null;
             });
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
+            errorMessage = $"Erro: {ex.Message}";
+            Console.WriteLine($"Erro ao carregar eventos: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
         }
     }
 

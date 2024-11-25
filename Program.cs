@@ -6,8 +6,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
   .AddInteractiveServerComponents();
 
-builder.Services.AddSingleton<EventLogAnalyzer>(sp => 
-  new EventLogAnalyzer(".", "Application")); // Usando "." para máquina local
+// builder.Services.AddSingleton<EventLogAnalyzer>(sp => 
+//   new EventLogAnalyzer(".", "Application")); // Usando "." para máquina local
+// builder.Services.AddScoped<EventLogAnalyzer>();
+builder.Services.AddScoped(sp => new EventLogAnalyzer("localhost", "Application"));
 
 var app = builder.Build();
 
