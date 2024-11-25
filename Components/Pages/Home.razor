@@ -1,7 +1,7 @@
 @page "/"
 @using MonitorEventViewer.Services
 @inject EventLogAnalyzer EventLogAnalyzer
-@* @rendermode @RenderMode.InteractiveServer *@
+@RenderMode.InteractiveServer
 
 <PageTitle>Monitor de Eventos</PageTitle>
 
@@ -121,6 +121,46 @@
     {
         try
         {
+            Console.WriteLine("Iniciando carregamento de eventos...");
+            Console.WriteLine($"Período: {StartTime} até {EndTime}");
+            Console.WriteLine($"Máquina: {MachineName}");
+
+            await Task.Run(() =>
+            {
+                Console.WriteLine("Obtendo contagem de eventos...");
+                EventCounts = EventLogAnalyzer.GetEventCountsByTimeRange(StartTime, EndTime);
+                Console.WriteLine($"Eventos obtidos: {EventCounts?.Count ?? 0} fontes");
+
+                if (EventCounts?.Count > 0)
+                {
+                    Console.WriteLine("Gerando imagem do gráfico...");
+                    var imageBytes = EventLogAnalyzer.GenerateChartImage(EventCounts);
+                    Console.WriteLine($"Imagem gerada: {imageBytes?.Length ?? 0} bytes");
+
+                    ChartImageBase64 = Convert.ToBase64String(imageBytes);
+                    Console.WriteLine("Imagem convertida para Base64");
+                }
+                else
+                {
+                    Console.WriteLine("Nenhum evento encontrado para gerar gráfico");
+                }
+
+                SelectedSource = null;
+            });
+
+            Console.WriteLine("Carregamento concluído");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro no LoadEvents: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
+        }
+    }
+
+    @* private async Task LoadEvents()
+    {
+        try
+        {
             errorMessage = "";
 
             await Task.Run(() =>
@@ -161,7 +201,7 @@
             Console.WriteLine($"Erro ao carregar eventos: {ex.Message}");
             Console.WriteLine($"StackTrace: {ex.StackTrace}");
         }
-    }
+    } *@
 
     private void ShowDetails(string source)
     {

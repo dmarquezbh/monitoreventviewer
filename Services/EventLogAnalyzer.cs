@@ -26,66 +26,91 @@ namespace MonitorEventViewer.Services
 
         public Dictionary<string, int> GetEventCountsByTimeRange(DateTime startTime, DateTime endTime)
         {
-            var counts = new Dictionary<string, int>();
             try
             {
-                Console.WriteLine($"Tentando acessar log '{_logName}' na máquina '{_machineName}'");
+                Console.WriteLine($"Buscando eventos de {startTime} até {endTime}");
+                Console.WriteLine($"Máquina: {_machineName}, Log: {_logName}");
+
                 var eventLog = new EventLog(_logName, _machineName);
-                Console.WriteLine($"Total de entradas no log: {eventLog.Entries.Count}");
+                Console.WriteLine($"Log aberto, total de entradas: {eventLog.Entries.Count}");
+
+                var counts = new Dictionary<string, int>();
+                int processedEntries = 0;
+                int matchingEntries = 0;
 
                 foreach (EventLogEntry entry in eventLog.Entries)
                 {
+                    processedEntries++;
                     if (entry.TimeWritten >= startTime && entry.TimeWritten <= endTime)
                     {
+                        matchingEntries++;
                         string source = entry.Source;
                         if (!counts.ContainsKey(source))
                             counts[source] = 0;
                         counts[source]++;
                     }
                 }
-                Console.WriteLine($"Eventos encontrados no período: {counts.Sum(x => x.Value)}");
+
+                Console.WriteLine($"Processadas {processedEntries} entradas");
+                Console.WriteLine($"Encontradas {matchingEntries} entradas no período");
+                Console.WriteLine($"Total de fontes diferentes: {counts.Count}");
+
+                return counts;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao acessar log de eventos: {ex.Message}");
+                Console.WriteLine($"Erro ao buscar eventos: {ex.Message}");
                 Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                throw;
             }
-
-            return counts;
         }
 
         public byte[] GenerateChartImage(Dictionary<string, int> eventCounts)
         {
             try
             {
-                Console.WriteLine("Iniciando geração do gráfico");
+                Console.WriteLine($"Iniciando geração do gráfico com {eventCounts.Count} eventos");
+
+                if (eventCounts.Count == 0)
+                {
+                    Console.WriteLine("Nenhum evento para gerar gráfico");
+                    return Array.Empty<byte>();
+                }
+
                 var plt = new Plot(1200, 800);
+                Console.WriteLine("Plot criado");
 
                 double[] values = eventCounts.Values.Select(x => (double)x).ToArray();
                 string[] labels = eventCounts.Keys.ToArray();
-
-                Console.WriteLine($"Dados para o gráfico: {values.Length} valores, {labels.Length} rótulos");
+                Console.WriteLine($"Arrays criados: {values.Length} valores, {labels.Length} rótulos");
 
                 plt.AddBar(values);
+                Console.WriteLine("Barras adicionadas");
+
                 plt.XTicks(Enumerable.Range(0, labels.Length).Select(x => (double)x).ToArray(), labels);
                 plt.XAxis.TickLabelStyle(rotation: 45);
+                Console.WriteLine("Rótulos configurados");
 
                 string tempFile = Path.Combine(Path.GetTempPath(), $"chart_{Guid.NewGuid()}.png");
-                Console.WriteLine($"Salvando gráfico em: {tempFile}");
+                Console.WriteLine($"Arquivo temporário: {tempFile}");
 
-                plt.SaveFig(tempFile);
-                Console.WriteLine("Gráfico salvo com sucesso");
-
-                var bytes = File.ReadAllBytes(tempFile);
-                Console.WriteLine($"Arquivo lido: {bytes.Length} bytes");
-
-                if (File.Exists(tempFile))
+                try
                 {
-                    File.Delete(tempFile);
-                    Console.WriteLine("Arquivo temporário deletado");
-                }
+                    plt.SaveFig(tempFile);
+                    Console.WriteLine("Gráfico salvo no arquivo temporário");
 
-                return bytes;
+                    var bytes = File.ReadAllBytes(tempFile);
+                    Console.WriteLine($"Arquivo lido: {bytes.Length} bytes");
+                    return bytes;
+                }
+                finally
+                {
+                    if (File.Exists(tempFile))
+                    {
+                        File.Delete(tempFile);
+                        Console.WriteLine("Arquivo temporário deletado");
+                    }
+                }
             }
             catch (Exception ex)
             {
