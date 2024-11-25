@@ -1,0 +1,134 @@
+@page "/"
+@using MonitorEventViewer.Services
+@inject EventLogAnalyzer EventLogAnalyzer
+@* @rendermode @RenderMode.InteractiveServer *@
+
+<PageTitle>Monitor de Eventos</PageTitle>
+
+<div class="container">
+    <h1>Monitor de Eventos do Windows</h1>
+
+    <div class="row mb-3">
+        <div class="col">
+            <div class="form-group">
+                <label>Data Inicial:</label>
+                <input type="datetime-local" class="form-control" @bind="StartTime" />
+            </div>
+        </div>
+        <div class="col">
+            <div class="form-group">
+                <label>Data Final:</label>
+                <input type="datetime-local" class="form-control" @bind="EndTime" />
+            </div>
+        </div>
+        <div class="col">
+            <div class="form-group">
+                <label>Máquina:</label>
+                <input type="text" class="form-control" @bind="MachineName" />
+            </div>
+        </div>
+        <div class="col d-flex align-items-end">
+            <button class="btn btn-primary" @onclick="LoadEvents">Carregar Eventos</button>
+        </div>
+    </div>
+
+    @if (ChartImageBase64 != null)
+    {
+        <div class="mb-3">
+            <img src="data:image/png;base64,@ChartImageBase64" class="img-fluid" />
+        </div>
+    }
+
+    @if (SelectedSource != null)
+    {
+        <h3>Detalhes dos Eventos - @SelectedSource</h3>
+        <button class="btn btn-secondary mb-3" @onclick="() => SelectedSource = null">Voltar</button>
+
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>ID</th>
+                        <th>Nível</th>
+                        <th>Mensagem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var evt in EventDetails)
+                    {
+                        <tr>
+                            <td>@evt.TimeCreated.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td>@evt.EventId</td>
+                            <td>@evt.LevelText</td>
+                            <td>@evt.Message</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (EventCounts?.Any() == true)
+    {
+        <h3>Resumo dos Eventos</h3>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Origem</th>
+                        <th>Quantidade</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var kvp in EventCounts.OrderByDescending(x => x.Value))
+                    {
+                        <tr>
+                            <td>@kvp.Key</td>
+                            <td>@kvp.Value</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" @onclick="() => ShowDetails(kvp.Key)">
+                                    Ver Detalhes
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private DateTime StartTime { get; set; } = DateTime.Today.AddHours(8);
+    private DateTime EndTime { get; set; } = DateTime.Today.AddHours(18);
+    private string MachineName { get; set; } = "192.168.200.7";
+    private Dictionary<string, int>? EventCounts { get; set; }
+    private string? ChartImageBase64 { get; set; }
+    private string? SelectedSource { get; set; }
+    private List<EventDetails> EventDetails { get; set; } = new();
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                EventCounts = EventLogAnalyzer.GetEventCountsByTimeRange(StartTime, EndTime);
+                var imageBytes = EventLogAnalyzer.GenerateChartImage(EventCounts);
+                ChartImageBase64 = Convert.ToBase64String(imageBytes);
+                SelectedSource = null;
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    private void ShowDetails(string source)
+    {
+        SelectedSource = source;
+        EventDetails = EventLogAnalyzer.GetEventDetails(source, StartTime, EndTime);
+    }
+}
